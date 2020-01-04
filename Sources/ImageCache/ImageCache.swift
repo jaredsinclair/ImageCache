@@ -22,13 +22,8 @@ import AppKit
 /// An image cache that balances high-performance features with straightforward
 /// usage and sensible defaults.
 ///
-/// - Note: This file is embarassingly long, but it's purposeful. Each file in
-/// Etcetera is meant to be self-contained, ready to be dropped into your
-/// project all by itself. That's also why this file has some duplicated bits of
-/// utility code found elsewhere in Etcetera.
-///
-/// - Warning: This class currently only supports iOS. I have vague plans to
-/// have it support macOS and watchOS, too, but that's not guaranteed.
+/// - Warning: This class currently only supports iOS and tvOS. I have vague plans
+/// to have it support macOS and watchOS, too, but that's a way's off.
 public final class ImageCache {
 
     // MARK: Shared Instance
