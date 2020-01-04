@@ -7,13 +7,16 @@
 //
 
 import Foundation
+import Etcetera
 
 extension FileManager {
 
     func image(fromFileAt url: URL) -> Image? {
-        if let data = try? Data(contentsOf: url) {
+        do {
+            let data = try Data(contentsOf: url)
             return Image(data: data)
-        } else {
+        } catch {
+            Log.error("Error reading image at \(url) error: \(error)")
             return nil
         }
     }
@@ -29,7 +32,9 @@ extension FileManager {
                 try removeItem(at: url)
             }
             try data.write(to: url, options: .atomic)
-        } catch {}
+        } catch {
+            Log.error("Error saving image to \(url) error: \(error)")
+        }
     }
 
 }
