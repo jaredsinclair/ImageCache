@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CoreGraphics
 
 /// Uniquely identifies a particular format of an image from a particular URL.
 final class ImageKey: Hashable {
@@ -34,7 +35,14 @@ final class ImageKey: Hashable {
         case let .scaled(size, mode, bleed, opaque, radius, border, contentScale):
             let base = "_scaled_\(Int(size.width))_\(Int(size.height))_\(mode)_\(Int(bleed))_\(opaque)_\(Int(radius))_\(Int(contentScale))"
             if let border = border, case .hairline(let color) = border {
-                return base + "_hairline(\(color))"
+                var r, g, b, a: CGFloat!
+                color.getRed(&r, green: &g, blue: &b, alpha: &a)
+                func describe(_ color: CGFloat?) -> String {
+                    let multiplied = (color ?? 0) * 1_000_000
+                    let rounded = Int(multiplied) / 1000
+                    return "\(rounded)"
+                }
+                return base + "_hairline(\(describe(r)),\(describe(g)),\(describe(b)),\(describe(a)))"
             } else {
                 return base + "_nil"
             }
