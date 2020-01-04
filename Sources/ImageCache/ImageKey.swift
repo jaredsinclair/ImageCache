@@ -35,21 +35,14 @@ final class ImageKey: Hashable {
         case let .scaled(size, mode, bleed, opaque, radius, border, contentScale):
             let base = "_scaled_\(Int(size.width))_\(Int(size.height))_\(mode)_\(Int(bleed))_\(opaque)_\(Int(radius))_\(Int(contentScale))"
             if let border = border, case .hairline(let color) = border {
-                var r, g, b, a: CGFloat!
-                color.getRed(&r, green: &g, blue: &b, alpha: &a)
-                func describe(_ color: CGFloat?) -> String {
-                    let multiplied = (color ?? 0) * 1_000_000
-                    let rounded = Int(multiplied) / 1000
-                    return "\(rounded)"
-                }
-                return base + "_hairline(\(describe(r)),\(describe(g)),\(describe(b)),\(describe(a)))"
+                return base + "_hairline(\(color.fileNameExpression))"
             } else {
                 return base + "_nil"
             }
         case let .round(size, border, contentScale):
             let base = "_round_\(Int(size.width))_\(Int(size.height))"
             if let border = border, case .hairline(let color) = border {
-                return base + "_hairline(\(color))" + "_\(Int(contentScale))"
+                return base + "_hairline(\(color.fileNameExpression))" + "_\(Int(contentScale))"
             } else {
                 return base + "_nil"
             }
@@ -60,6 +53,24 @@ final class ImageKey: Hashable {
 
     static func == (lhs: ImageKey, rhs: ImageKey) -> Bool {
         return lhs.url == rhs.url && lhs.format == rhs.format
+    }
+
+}
+
+extension Color {
+
+    var fileNameExpression: String {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        getRed(&r, green: &g, blue: &b, alpha: &a)
+        func describe(_ color: CGFloat) -> String {
+            let multiplied = color * 1_000_000
+            let rounded = Int(multiplied) / 1000
+            return "\(rounded)"
+        }
+        return "\(describe(r))-\(describe(g))-\(describe(b))-\(describe(a))"
     }
 
 }
