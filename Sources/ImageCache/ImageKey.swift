@@ -12,19 +12,19 @@ import CoreGraphics
 /// Uniquely identifies a particular format of an image from a particular URL.
 final class ImageKey: Hashable {
 
-    /// The HTTP URL to the original image from which the cached image was derived.
-    let url: URL
+    /// The source from which the original image can be obtained
+    let source: ImageCache.OriginalImageSource
 
     /// The format used when processing the cached image.
     let format: ImageCache.Format
 
-    init(url: URL, format: ImageCache.Format) {
-        self.url = url
+    init(source: ImageCache.OriginalImageSource, format: ImageCache.Format) {
+        self.source = source
         self.format = format
     }
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(url)
+        hasher.combine(source)
         hasher.combine(format)
     }
 
@@ -52,7 +52,7 @@ final class ImageKey: Hashable {
     }
 
     static func == (lhs: ImageKey, rhs: ImageKey) -> Bool {
-        return lhs.url == rhs.url && lhs.format == rhs.format
+        return lhs.source == rhs.source && lhs.format == rhs.format
     }
 
 }

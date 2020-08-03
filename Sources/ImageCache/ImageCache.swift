@@ -156,7 +156,12 @@ public final class ImageCache {
     /// will be abandoned.
     @discardableResult
     public func image(from url: URL, format: Format = .original, completion: @escaping (Image?) -> Void) -> CallbackMode {
-        let key = ImageKey(url: url, format: format)
+        image(from: .url(url), format: format, completion: completion)
+    }
+
+    /// @JARED
+    public func image(from source: OriginalImageSource, format: Format = .original, completion: @escaping (Image?) -> Void) -> CallbackMode {
+        let key = ImageKey(source: source, format: format)
         return image(for: key, completion: completion)
     }
 
@@ -292,12 +297,12 @@ public final class ImageCache {
     private func actualKey(forUserProvidedKey key: String, format: Format) -> ImageKey? {
         guard let encoded = key.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return nil}
         guard let url = URL(string: "imagecache://\(encoded)") else { return nil}
-        return ImageKey(url: url, format: format)
+        return ImageKey(source: .url(url), format: format)
     }
 
     /// Returns the original string used for a user-provided key.
-    private func userProvidedString(forKey key: ImageKey) -> String? {
-        let absolute = key.url.absoluteString
+    private func userProvidedString(forImageKeyURL url: URL) -> String? {
+        let absolute = url.absoluteString
         let prefix = "imagecache://"
         guard absolute.hasPrefix(prefix) else { return nil }
         let encoded = absolute.replacingOccurrences(of: prefix, with: "")
@@ -371,25 +376,54 @@ public final class ImageCache {
     /// - returns: Returns an ID for the request. This ID can be used to later
     /// cancel the request if needed.
     private func downloadFile(for key: ImageKey, completion: @escaping (DownloadResult?) -> Void) -> UUID {
+        enum TaskValue {
+            case url(URLSessionDownloadTask)
+            case custom(OriginalImageSource.Loader)
+
+            func cancel() {
+                switch self {
+                case .url(let task):
+                    task.cancel()
+                case .custom:
+                    break // not supported, yet.
+                }
+            }
+        }
+
         let destination = fileUrl(forOriginalImageWithKey: key)
-        let taskValue = DeferredValue<URLSessionDownloadTask>()
+        let taskValue = DeferredValue<TaskValue>()
         return downloadTaskRegistry.addRequest(
             taskId: key,
             workQueue: workQueue,
             taskExecution: { finish in
                 if FileManager.default.fileExists(at: destination), let image = Image.fromFile(at: destination) {
                     finish(.previous(image))
-                } else if self.userProvidedString(forKey: key) != nil {
-                    finish(nil)
                 } else {
-                    taskValue.value = self.urlSession.downloadTask(with: key.url) { (temp, _, _) in
-                        if let temp = temp, let _ = try? FileManager.default.moveFile(from: temp, to: destination) {
-                            finish(.fresh(destination))
-                        } else {
+                    switch key.source {
+                    case .url(let url):
+                        if self.userProvidedString(forImageKeyURL: url) != nil {
                             finish(nil)
+                        } else {
+                            let urlTask = self.urlSession.downloadTask(with: url) { (temp, _, _) in
+                                if let temp = temp, let _ = try? FileManager.default.moveFile(from: temp, to: destination) {
+                                    finish(.fresh(destination))
+                                } else {
+                                    finish(nil)
+                                }
+                            }
+                            taskValue.value = .url(urlTask)
+                            urlTask.resume()
+                        }
+                    case .custom(_, _, let loader):
+                        taskValue.value = .custom(loader)
+                        loader { image in
+                            if let image = image {
+                                finish(.previous(image))
+                            } else {
+                                finish(nil)
+                            }
                         }
                     }
-                    taskValue.value?.resume()
                 }
         },
             taskCancellation: { taskValue.value?.cancel() },
@@ -420,13 +454,25 @@ public final class ImageCache {
     }
 
     private func fileUrl(forOriginalImageWithKey key: ImageKey) -> URL {
-        let originalKey = ImageKey(url: key.url, format: .original)
-        let filename = uniqueFilenameFromUrl(key.url) + originalKey.filenameSuffix
+        let filename: String
+        switch key.source {
+        case .url(let url):
+            let originalKey = ImageKey(source: .url(url), format: .original)
+            filename = uniqueFilenameFromUrl(url) + originalKey.filenameSuffix
+        case .custom(let identifier, let namespace, _):
+            filename = "\(namespace).\(identifier).CUSTOM_ORIGINAL"
+        }
         return directory.appendingPathComponent(filename, isDirectory: false)
     }
 
     private func fileUrl(forFormattedImageWithKey key: ImageKey) -> URL {
-        let filename = uniqueFilenameFromUrl(key.url) + key.filenameSuffix
+        let filename: String
+        switch key.source {
+        case .url(let url):
+            filename = uniqueFilenameFromUrl(url) + key.filenameSuffix
+        case .custom(let identifier, let namespace, _):
+            filename = "\(namespace).\(identifier).\(key.filenameSuffix)"
+        }
         return directory.appendingPathComponent(filename, isDirectory: false)
     }
 
