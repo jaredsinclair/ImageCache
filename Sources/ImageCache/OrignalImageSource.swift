@@ -16,11 +16,11 @@ public extension ImageCache {
         case url(URL)
 
         /// @JARED
-        case custom(ImageIdentifier, Namespace, Loader)
+        case custom(imageIdentifier: ImageIdentifier, namespace: Namespace, loader: Loader)
 
         public typealias ImageIdentifier = String
         public typealias Namespace = String
-        public typealias Loader = (LoaderCompletion) -> Void
+        public typealias Loader = (@escaping LoaderCompletion) -> Void
         public typealias LoaderCompletion = (Image?) -> Void
 
         public static func ==(lhs: OriginalImageSource, rhs: OriginalImageSource) -> Bool {
