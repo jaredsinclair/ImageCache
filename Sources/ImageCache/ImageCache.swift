@@ -69,6 +69,7 @@ public final class ImageCache {
     private let userImageDiskTaskRegistry = TaskRegistry<ImageKey, URL>()
     private let memoryCache = MemoryCache<ImageKey, Image>()
     private let formattingQueue: OperationQueue
+    private let diskWritingQueue: OperationQueue
     private let workQueue: OperationQueue
     private var observers = [NSObjectProtocol]()
 
@@ -102,6 +103,11 @@ public final class ImageCache {
         self.workQueue = {
             let q = OperationQueue()
             q.qualityOfService = .userInitiated
+            return q
+        }()
+        self.diskWritingQueue = {
+            let q = OperationQueue()
+            q.qualityOfService = .background
             return q
         }()
         _ = FileManager.default.createDirectory(at: directory)
@@ -211,7 +217,7 @@ public final class ImageCache {
                         finish(fileUrl)
                     }
                     saveOperation = blockOperation
-                    self.formattingQueue.addOperation(blockOperation)
+                    self.diskWritingQueue.addOperation(blockOperation)
                 }, taskCancellation: {
                     saveOperation?.cancel()
                 }, taskCompletion: { _ in
@@ -343,7 +349,9 @@ public final class ImageCache {
                     let blockOperation = BlockOperation {
                         let image = key.format.image(from: result)
                         if let image = image {
-                            FileManager.default.save(image, to: destination)
+                            this.diskWritingQueue.addOperation {
+                                FileManager.default.save(image, to: destination)
+                            }
                         }
                         finish(image)
                     }
