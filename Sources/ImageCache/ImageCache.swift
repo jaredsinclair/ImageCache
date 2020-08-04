@@ -309,7 +309,7 @@ public final class ImageCache {
                 this.memoryCache[key] = image
                 completion(image)
             } else {
-                downloadRequestId.value = this.downloadFile(for: key) { [weak this] downloadResult in
+                downloadRequestId.value = this.obtainOriginalFile(for: key) { [weak this] downloadResult in
                     guard let this = this else { completion(nil); return }
                     guard let downloadResult = downloadResult else { completion(nil); return }
                     // `this.formatImage` is asynchronous, but returns a request ID
@@ -389,7 +389,7 @@ public final class ImageCache {
         )
     }
 
-    /// Adds a request for downloading an image.
+    /// Adds a request for obtaining the canonical version of an image.
     ///
     /// If the original image is found already on disk, then the image will be
     /// instantiated from the data on disk. Otherwise, the image will be
@@ -403,7 +403,7 @@ public final class ImageCache {
     ///
     /// - returns: Returns an ID for the request. This ID can be used to later
     /// cancel the request if needed.
-    private func downloadFile(for key: ImageKey, completion: @escaping (DownloadResult?) -> Void) -> UUID {
+    private func obtainOriginalFile(for key: ImageKey, completion: @escaping (DownloadResult?) -> Void) -> UUID {
         enum TaskValue {
             case url(URLSessionDownloadTask)
             case manuallySeeded
@@ -482,6 +482,8 @@ public final class ImageCache {
         }
     }
 
+    /// Returns the absolute file URL for the original image included in `key`,
+    /// regardless of the `format` used in `key`.
     private func fileUrl(forOriginalImageWithKey key: ImageKey) -> URL {
         let filename: String
         switch key.source {
@@ -496,6 +498,8 @@ public final class ImageCache {
         return directory.appendingPathComponent(filename, isDirectory: false)
     }
 
+    /// Returns the absolute file URL for an image with `key`, taking into
+    /// account the format specified by that key (we save formatted images, too).
     private func fileUrl(forFormattedImageWithKey key: ImageKey) -> URL {
         let filename: String
         switch key.source {

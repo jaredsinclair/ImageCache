@@ -9,16 +9,24 @@ import Foundation
 
 public extension ImageCache {
 
-    /// @JARED
+    /// ImageCache supports multiple ways of obtaining original images:
+    ///
+    /// - from an HTTP/FILE URL
+    /// - by manually seeding the original image before requesters ask for it
+    /// - by providing a custom source
+    ///
+    /// Of these only the first two will have their original (canonical) images
+    /// written to ImageCache's disk cache. If you use `.custom` it's your
+    /// responsiblity to maintain a cache of the original value as needed.
     enum OriginalImageSource: Hashable {
 
-        /// @JARED
+        /// The HTTP/FILE URL to the file.
         case url(URL)
 
-        /// @JARED
+        /// The image will be manually seeded into the cache.
         case manuallySeeded(imageIdentifier: ImageIdentifier)
 
-        /// @JARED
+        /// A custom means of obtaining a source image.
         case custom(imageIdentifier: ImageIdentifier, namespace: Namespace, loader: Loader)
 
         public typealias ImageIdentifier = String
