@@ -16,6 +16,9 @@ public extension ImageCache {
         case url(URL)
 
         /// @JARED
+        case manuallySeeded(imageIdentifier: ImageIdentifier)
+
+        /// @JARED
         case custom(imageIdentifier: ImageIdentifier, namespace: Namespace, loader: Loader)
 
         public typealias ImageIdentifier = String
@@ -27,9 +30,11 @@ public extension ImageCache {
             switch (lhs, rhs) {
             case (.url(let left), .url(let right)):
                 return left == right
+            case (.manuallySeeded(let left), .manuallySeeded(let right)):
+                return left == right
             case (.custom(let l1, let l2, _), .custom(let r1, let r2, _)):
                 return l1 == r1 && l2 == r2
-            case (.url, _), (.custom, _):
+            case (.url, _), (.manuallySeeded, _), (.custom, _):
                 return false
             }
         }
@@ -38,6 +43,8 @@ public extension ImageCache {
             switch self {
             case .url(let url):
                 hasher.combine(url)
+            case .manuallySeeded(let imageIdentifier):
+                hasher.combine(imageIdentifier)
             case .custom(let identifier, let namespace, _):
                 hasher.combine(identifier)
                 hasher.combine(namespace)

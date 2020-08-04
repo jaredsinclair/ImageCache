@@ -165,7 +165,45 @@ public final class ImageCache {
         image(from: .url(url), format: format, completion: completion)
     }
 
-    /// @JARED
+    /// Retrieves an image from the specified source, formatted to the requested
+    /// format.
+    ///
+    /// If the formatted image already exists in memory, it will be returned
+    /// synchronously. If not, ImageCache will look for the cached formatted
+    /// image on disk. If that is not found, ImageCache will look for the cached
+    /// original image on disk, format it, save the formatted image to disk, and
+    /// return the formatted image. If all of the above turn up empty, the
+    /// original file will be obtained from the source and saved to disk, then
+    /// the formatted image will be generated and saved to disk, then the
+    /// formatted image will be cached in memory, and then finally the formatted
+    /// image will be returned to the caller via the completion handler. If any
+    /// of the above steps fail, the completion block will be called with `nil`.
+    ///
+    /// Concurrent requests for the same resource are combined into the smallest
+    /// possible number of active tasks. Requests for different image formats
+    /// based on the same original image will lead to a single obtain task for
+    /// the original file. Requests for the same image format will lead to a
+    /// single image formatting task. The same result is distributed to all
+    /// requests in the order in which they were requested.
+    ///
+    /// - parameter source: The source where the original image is found.
+    ///
+    /// - parameter format: The desired image format for the completion result.
+    ///
+    /// - parameter completion: A completion handler called when the image is
+    /// available in the desired format, or if the request failed. The
+    /// completion handler will always be performed on the main queue.
+    ///
+    /// - returns: A callback mode indicating whether the completion handler was
+    /// executed synchronously before the return, or will be executed
+    /// asynchronously at some point in the future. When asynchronous, the
+    /// cancellation block associated value of the `.async` mode can be used to
+    /// cancel the request for this image. Cancelling a request will not cancel
+    /// any other in-flight requests. If the cancelled request was the only
+    /// remaining request awaiting the result of a downloading or formatting
+    /// task, then the unneeded task will be cancelled and any in-progress work
+    /// will be abandoned.
+    @discardableResult
     public func image(from source: OriginalImageSource, format: Format = .original, completion: @escaping (Image?) -> Void) -> CallbackMode {
         let key = ImageKey(source: source, format: format)
         return image(for: key, completion: completion)
@@ -197,10 +235,10 @@ public final class ImageCache {
     /// - parameter completion: Performed when the image has been added to all
     /// the requested destinations. May or may not be called synchronously.
     public func add(userProvidedImage image: Image, to destinations: [UserProvidedImageDestination] = UserProvidedImageDestination.allCases, key: String, completion: @escaping (_ fileUrl: URL?) -> Void) {
-        guard let actualKey = self.actualKey(forUserProvidedKey: key, format: .original) else { return }
+        let key = ImageKey(source: .manuallySeeded(imageIdentifier: key), format: .original)
         onMain {
             if destinations.contains(.memory) {
-                self.memoryCache[actualKey] = image
+                self.memoryCache[key] = image
             }
             guard destinations.contains(.disk) else {
                 completion(nil)
@@ -208,11 +246,11 @@ public final class ImageCache {
             }
             var saveOperation: Operation?
             _ = self.userImageDiskTaskRegistry.addRequest(
-                taskId: actualKey,
+                taskId: key,
                 workQueue: self.workQueue,
                 taskExecution: { finish in
                     let blockOperation = BlockOperation {
-                        let fileUrl = self.fileUrl(forOriginalImageWithKey: actualKey)
+                        let fileUrl = self.fileUrl(forOriginalImageWithKey: key)
                         FileManager.default.save(image, to: fileUrl)
                         finish(fileUrl)
                     }
@@ -236,15 +274,13 @@ public final class ImageCache {
     /// been added via `add(userProvidedImage:to:key:)`
     @discardableResult
     public func userProvidedImage(key: String, format: Format = .original, completion: @escaping (Image?) -> Void) -> CallbackMode {
-        guard let actualKey = self.actualKey(forUserProvidedKey: key, format: format) else {
-            completion(nil)
-            return .sync
-        }
-        return image(for: actualKey, completion: completion)
+        let key = ImageKey(source: .manuallySeeded(imageIdentifier: key), format: format)
+        return image(for: key, completion: completion)
     }
 
     // MARK: Private Methods
 
+    /// Fetches an image using all the heuristics described above.
     private func image(for key: ImageKey, completion: @escaping (Image?) -> Void) -> CallbackMode {
 
         let task = BackgroundTask.start()
@@ -297,22 +333,6 @@ public final class ImageCache {
                 this.downloadTaskRegistry.cancelRequest(withId: id)
             }
         })
-    }
-
-    /// Returns the underlying ImageKey used for a user-provided key.
-    private func actualKey(forUserProvidedKey key: String, format: Format) -> ImageKey? {
-        guard let encoded = key.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return nil}
-        guard let url = URL(string: "imagecache://\(encoded)") else { return nil}
-        return ImageKey(source: .url(url), format: format)
-    }
-
-    /// Returns the original string used for a user-provided key.
-    private func userProvidedString(forImageKeyURL url: URL) -> String? {
-        let absolute = url.absoluteString
-        let prefix = "imagecache://"
-        guard absolute.hasPrefix(prefix) else { return nil }
-        let encoded = absolute.replacingOccurrences(of: prefix, with: "")
-        return encoded.removingPercentEncoding
     }
 
     /// Adds a request for formatting a downloaded image. If this request is the
@@ -386,12 +406,15 @@ public final class ImageCache {
     private func downloadFile(for key: ImageKey, completion: @escaping (DownloadResult?) -> Void) -> UUID {
         enum TaskValue {
             case url(URLSessionDownloadTask)
+            case manuallySeeded
             case custom(OriginalImageSource.Loader)
 
             func cancel() {
                 switch self {
                 case .url(let task):
                     task.cancel()
+                case .manuallySeeded:
+                    break // not cancellable
                 case .custom:
                     break // not supported, yet.
                 }
@@ -409,19 +432,17 @@ public final class ImageCache {
                 } else {
                     switch key.source {
                     case .url(let url):
-                        if self.userProvidedString(forImageKeyURL: url) != nil {
-                            finish(nil)
-                        } else {
-                            let urlTask = self.urlSession.downloadTask(with: url) { (temp, _, _) in
-                                if let temp = temp, let _ = try? FileManager.default.moveFile(from: temp, to: destination) {
-                                    finish(.fresh(destination))
-                                } else {
-                                    finish(nil)
-                                }
+                        let urlTask = self.urlSession.downloadTask(with: url) { (temp, _, _) in
+                            if let temp = temp, let _ = try? FileManager.default.moveFile(from: temp, to: destination) {
+                                finish(.fresh(destination))
+                            } else {
+                                finish(nil)
                             }
-                            taskValue.value = .url(urlTask)
-                            urlTask.resume()
                         }
+                        taskValue.value = .url(urlTask)
+                        urlTask.resume()
+                    case .manuallySeeded:
+                        finish(nil)
                     case .custom(_, _, let loader):
                         taskValue.value = .custom(loader)
                         loader { image in
@@ -467,8 +488,10 @@ public final class ImageCache {
         case .url(let url):
             let originalKey = ImageKey(source: .url(url), format: .original)
             filename = uniqueFilenameFromUrl(url) + originalKey.filenameSuffix
-        case .custom(let identifier, let namespace, _):
-            filename = "\(namespace).\(identifier).CUSTOM_ORIGINAL"
+        case .manuallySeeded(let id):
+            filename = "\(id).MANUALLY_SEEDED_ORIGINAL"
+        case .custom(let id, let namespace, _):
+            filename = "\(namespace).\(id).CUSTOM_ORIGINAL"
         }
         return directory.appendingPathComponent(filename, isDirectory: false)
     }
@@ -478,6 +501,8 @@ public final class ImageCache {
         switch key.source {
         case .url(let url):
             filename = uniqueFilenameFromUrl(url) + key.filenameSuffix
+        case .manuallySeeded(let id):
+            filename = "\(id).\(key.filenameSuffix)"
         case .custom(let identifier, let namespace, _):
             filename = "\(namespace).\(identifier).\(key.filenameSuffix)"
         }
