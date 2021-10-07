@@ -25,6 +25,8 @@ public enum /*scope*/ ImageDrawing {
     public static func draw(_ image: ImageCache.Image, format: ImageCache.Format) -> ImageCache.Image {
         switch format {
         case .original:
+            return image
+        case .decompressed:
             return decompress(image)
         case let .scaled(size, mode, bleed, opaque, cornerRadius, border, contentScale):
             return draw(image, at: size, using: mode, bleed: bleed, opaque: opaque, cornerRadius: cornerRadius, border: border, contentScale: contentScale)

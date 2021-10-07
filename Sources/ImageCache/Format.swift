@@ -29,6 +29,10 @@ extension ImageCache {
         /// Do not modify the source image in any way.
         case original
 
+        /// Decompressed on a background queue (by drawing the data into a buffer
+        /// that's then discarded), but otherwise umodified.
+        case decompressed
+
         /// Scale the source image, with a variety of options.
         ///
         /// - parameter size: The desired output size, in points.
@@ -208,7 +212,7 @@ extension ImageCache.Format: Hashable {
 
     public func hash(into hasher: inout Hasher) {
         switch self {
-        case .original:
+        case .original, .decompressed:
             hasher.combine(".original")
         case let .scaled(size, mode, bleed, opaque, cornerRadius, border, contentScale):
             hasher.combine(".scaled")

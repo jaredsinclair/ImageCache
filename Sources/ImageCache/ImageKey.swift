@@ -30,7 +30,7 @@ final class ImageKey: Hashable {
 
     var filenameSuffix: String {
         switch format {
-        case .original:
+        case .original, .decompressed:
             return "_original"
         case let .scaled(size, mode, bleed, opaque, radius, border, contentScale):
             let base = "_scaled_\(Int(size.width))_\(Int(size.height))_\(mode)_\(Int(bleed))_\(opaque)_\(Int(radius))_\(Int(contentScale))"
