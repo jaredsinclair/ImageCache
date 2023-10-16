@@ -8,10 +8,10 @@
 
 import Foundation
 
-func onMain(_ block: @escaping () -> Void) {
+func onMain(_ block: @escaping @Sendable @MainActor () -> Void) {
     DispatchQueue.main.async { block() }
 }
 
-func deferred(on queue: OperationQueue, block: @escaping () -> Void) {
+func deferred(on queue: OperationQueue, block: @escaping @Sendable () -> Void) {
     onMain { queue.addOperation(block) }
 }

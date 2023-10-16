@@ -12,6 +12,7 @@
 
 import CryptoKit
 import Etcetera
+import Combine
 
 #if os(iOS)
 import UIKit
@@ -24,7 +25,7 @@ import AppKit
 ///
 /// - Warning: This class currently only supports iOS and tvOS. I have vague plans
 /// to have it support macOS and watchOS, too, but that's a way's off.
-public final class ImageCache {
+@MainActor public final class ImageCache {
 
     // MARK: Shared Instance
 
@@ -34,7 +35,7 @@ public final class ImageCache {
     // MARK: Public Properties
 
     /// The default directory where ImageCache stores files on disk.
-    public static var defaultDirectory: URL {
+    public nonisolated static var defaultDirectory: URL {
         return FileManager.default.cachesDirectory().subdirectory(named: "Images")
     }
 
@@ -49,7 +50,10 @@ public final class ImageCache {
 
     /// Your app can provide something stronger than the default implementation
     /// (a string representation of a SHA1 hash) if so desired.
-    public var uniqueFilenameFromUrl: (URL) -> String
+    public nonisolated var uniqueFilenameFromUrl: (URL) -> String {
+        get { _uniqueFilenameFromUrl.current }
+        set { _uniqueFilenameFromUrl.current = newValue }
+    }
 
     /// When `true` this will empty the in-memory cache when the app enters the
     /// background. This can help reduce the likelihood that your app will be
@@ -71,7 +75,8 @@ public final class ImageCache {
     private let formattingQueue: OperationQueue
     private let diskWritingQueue: OperationQueue
     private let workQueue: OperationQueue
-    private var observers = [NSObjectProtocol]()
+    private nonisolated let _uniqueFilenameFromUrl: Protected<(URL) -> String>
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: Init / Deinit
 
@@ -85,8 +90,11 @@ public final class ImageCache {
     /// items first). Trimming will occur whenever the app enters the
     /// background, or when this value is changed. Provide a `nil` value to
     /// allow for unbounded disk usage. YOLO.
-    public init(directory: URL = ImageCache.defaultDirectory, byteLimitForFileStorage: Bytes? = .fromMegabytes(500)) {
-        self.uniqueFilenameFromUrl = Insecure.SHA1.filename(for:)
+    public init(
+        directory: URL = ImageCache.defaultDirectory,
+        byteLimitForFileStorage: Bytes? = .fromMegabytes(500)
+    ) {
+        self._uniqueFilenameFromUrl = Protected(Insecure.SHA1.filename(for:))
         self.directory = directory
         self.byteLimitForFileStorage = byteLimitForFileStorage
         self.urlSession = {
@@ -111,13 +119,7 @@ public final class ImageCache {
             return q
         }()
         _ = FileManager.default.createDirectory(at: directory)
-        registerObservers()
-    }
-
-    deinit {
-        observers.forEach {
-            NotificationCenter.default.removeObserver($0)
-        }
+        observeNotifications()
     }
 
     // MARK: Public Methods
@@ -161,7 +163,11 @@ public final class ImageCache {
     /// task, then the unneeded task will be cancelled and any in-progress work
     /// will be abandoned.
     @discardableResult
-    public func image(from url: URL, format: Format = .original, completion: @escaping (Image?) -> Void) -> CallbackMode {
+    public func image(
+        from url: URL,
+        format: Format = .original,
+        completion: @escaping @Sendable @MainActor (Image?) -> Void
+    ) -> CallbackMode {
         image(from: .url(url), format: format, completion: completion)
     }
 
@@ -204,7 +210,11 @@ public final class ImageCache {
     /// task, then the unneeded task will be cancelled and any in-progress work
     /// will be abandoned.
     @discardableResult
-    public func image(from source: OriginalImageSource, format: Format = .original, completion: @escaping (Image?) -> Void) -> CallbackMode {
+    public func image(
+        from source: OriginalImageSource,
+        format: Format = .original,
+        completion: @escaping @Sendable @MainActor (Image?) -> Void
+    ) -> CallbackMode {
         let key = ImageKey(source: source, format: format)
         return image(for: key, completion: completion)
     }
@@ -234,7 +244,12 @@ public final class ImageCache {
     ///
     /// - parameter completion: Performed when the image has been added to all
     /// the requested destinations. May or may not be called synchronously.
-    public func add(userProvidedImage image: Image, to destinations: [UserProvidedImageDestination] = UserProvidedImageDestination.allCases, key: String, completion: @escaping (_ fileUrl: URL?) -> Void) {
+    public func add(
+        userProvidedImage image: Image,
+        to destinations: [UserProvidedImageDestination] = UserProvidedImageDestination.allCases,
+        key: String,
+        completion: @escaping @Sendable @MainActor (_ fileUrl: URL?) -> Void
+    ) {
         let key = ImageKey(source: .manuallySeeded(imageIdentifier: key), format: .original)
         onMain {
             if destinations.contains(.memory) {
@@ -244,7 +259,7 @@ public final class ImageCache {
                 completion(nil)
                 return
             }
-            var saveOperation: Operation?
+            let saveOperation = DeferredValue<Operation>()
             _ = self.userImageDiskTaskRegistry.addRequest(
                 taskId: key,
                 workQueue: self.workQueue,
@@ -252,12 +267,12 @@ public final class ImageCache {
                     let blockOperation = BlockOperation {
                         let fileUrl = self.fileUrl(forOriginalImageWithKey: key)
                         FileManager.default.save(image, to: fileUrl)
-                        finish(fileUrl)
+                        onMain { finish(fileUrl) }
                     }
-                    saveOperation = blockOperation
+                    saveOperation.value = blockOperation
                     self.diskWritingQueue.addOperation(blockOperation)
                 }, taskCancellation: {
-                    saveOperation?.cancel()
+                    saveOperation.value?.cancel()
                 }, taskCompletion: { _ in
                     // no-op
                 }, requestCompletion: { url in
@@ -273,7 +288,11 @@ public final class ImageCache {
     /// This method will resolve to a `nil` image if the image has not already
     /// been added via `add(userProvidedImage:to:key:)`
     @discardableResult
-    public func userProvidedImage(key: String, format: Format = .original, completion: @escaping (Image?) -> Void) -> CallbackMode {
+    public func userProvidedImage(
+        key: String,
+        format: Format = .original,
+        completion: @escaping @Sendable @MainActor (Image?) -> Void
+    ) -> CallbackMode {
         let key = ImageKey(source: .manuallySeeded(imageIdentifier: key), format: format)
         return image(for: key, completion: completion)
     }
@@ -281,10 +300,13 @@ public final class ImageCache {
     // MARK: Private Methods
 
     /// Fetches an image using all the heuristics described above.
-    private func image(for key: ImageKey, completion: @escaping (Image?) -> Void) -> CallbackMode {
+    private func image(
+        for key: ImageKey,
+        completion: @escaping @Sendable @MainActor (Image?) -> Void
+    ) -> CallbackMode {
 
         let task = BackgroundTask.start()
-        let completion: (Image?) -> Void = {
+        let completion: @Sendable @MainActor (Image?) -> Void = {
             completion($0)
             task?.end()
         }
@@ -355,16 +377,23 @@ public final class ImageCache {
     ///
     /// - returns: Returns an ID for the request. This ID can be used to later
     /// cancel the request if needed.
-    private func formatImage(key: ImageKey, result: DownloadResult, completion: @escaping (Image?) -> Void) -> UUID {
-        var operation: Operation?
+    private func formatImage(
+        key: ImageKey,
+        result: DownloadResult,
+        completion: @escaping @Sendable @MainActor (Image?) -> Void
+    ) -> UUID {
+        let operation = DeferredValue<Operation>()
         return formattingTaskRegistry.addRequest(
             taskId: key,
             workQueue: workQueue,
             taskExecution: { [weak self] finish in
-                guard let this = self else { finish(nil); return }
+                guard let this = self else {
+                    onMain { finish(nil) }
+                    return
+                }
                 let destination = this.fileUrl(forFormattedImageWithKey: key)
                 if let image = FileManager.default.image(fromFileAt: destination) {
-                    finish(image)
+                    onMain { finish(image) }
                 } else {
                     let blockOperation = BlockOperation {
                         let image = key.format.image(from: result)
@@ -373,14 +402,14 @@ public final class ImageCache {
                                 FileManager.default.save(image, to: destination)
                             }
                         }
-                        finish(image)
+                        onMain { finish(image) }
                     }
-                    operation = blockOperation
+                    operation.value = blockOperation
                     this.formattingQueue.addOperation(blockOperation)
                 }
             },
             taskCancellation: {
-                operation?.cancel()
+                operation.value?.cancel()
             },
             taskCompletion: { [weak self] result in
                 result.map { self?.memoryCache[key] = $0 }
@@ -403,7 +432,10 @@ public final class ImageCache {
     ///
     /// - returns: Returns an ID for the request. This ID can be used to later
     /// cancel the request if needed.
-    private func obtainOriginalFile(for key: ImageKey, completion: @escaping (DownloadResult?) -> Void) -> UUID {
+    private func obtainOriginalFile(
+        for key: ImageKey,
+        completion: @escaping @Sendable @MainActor (DownloadResult?) -> Void
+    ) -> UUID {
         enum TaskValue {
             case url(URLSessionDownloadTask)
             case manuallySeeded
@@ -428,28 +460,28 @@ public final class ImageCache {
             workQueue: workQueue,
             taskExecution: { finish in
                 if FileManager.default.fileExists(at: destination), let image = Image.fromFile(at: destination) {
-                    finish(.previous(image))
+                    onMain { finish(.previous(image)) }
                 } else {
                     switch key.source {
                     case .url(let url):
                         let urlTask = self.urlSession.downloadTask(with: url) { (temp, _, _) in
                             if let temp = temp, let _ = try? FileManager.default.moveFile(from: temp, to: destination) {
-                                finish(.fresh(destination))
+                                onMain { finish(.fresh(destination)) }
                             } else {
-                                finish(nil)
+                                onMain { finish(nil) }
                             }
                         }
                         taskValue.value = .url(urlTask)
                         urlTask.resume()
                     case .manuallySeeded:
-                        finish(nil)
+                        onMain { finish(nil) }
                     case .custom(_, _, let loader):
                         taskValue.value = .custom(loader)
                         loader { image in
                             if let image = image {
-                                finish(.previous(image))
+                                onMain { finish(.previous(image)) }
                             } else {
-                                finish(nil)
+                                onMain { finish(nil) }
                             }
                         }
                     }
@@ -468,7 +500,10 @@ public final class ImageCache {
     /// - parameter completion: A block performed with the result, called upon
     /// the main queue. If found, the image is decompressed on a background
     /// queue to avoid doing so on the main queue.
-    private func checkForFormattedImage(key: ImageKey, completion: @escaping (Image?) -> Void) {
+    private func checkForFormattedImage(
+        key: ImageKey,
+        completion: @escaping @Sendable @MainActor (Image?) -> Void
+    ) {
         deferred(on: workQueue) {
             let image: Image? = {
                 let destination = self.fileUrl(forFormattedImageWithKey: key)
@@ -484,7 +519,7 @@ public final class ImageCache {
 
     /// Returns the absolute file URL for the original image included in `key`,
     /// regardless of the `format` used in `key`.
-    private func fileUrl(forOriginalImageWithKey key: ImageKey) -> URL {
+    private nonisolated func fileUrl(forOriginalImageWithKey key: ImageKey) -> URL {
         let filename: String
         switch key.source {
         case .url(let url):
@@ -500,7 +535,7 @@ public final class ImageCache {
 
     /// Returns the absolute file URL for an image with `key`, taking into
     /// account the format specified by that key (we save formatted images, too).
-    private func fileUrl(forFormattedImageWithKey key: ImageKey) -> URL {
+    private nonisolated func fileUrl(forFormattedImageWithKey key: ImageKey) -> URL {
         let filename: String
         switch key.source {
         case .url(let url):
@@ -513,15 +548,17 @@ public final class ImageCache {
         return directory.appendingPathComponent(filename, isDirectory: false)
     }
 
-    private func registerObservers() {
+    private func observeNotifications() {
         #if os(iOS)
-            observers.append(NotificationCenter.default.addObserver(
-                forName: UIApplication.didEnterBackgroundNotification,
-                object: nil,
-                queue: .main,
-                using: { [weak self] _ in
+        NotificationCenter.default
+            .publisher(for: UIApplication.didReceiveMemoryWarningNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
                     self?.trimStaleFiles()
-            }))
+                }
+            }
+            .store(in: &cancellables)
         #endif
     }
 

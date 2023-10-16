@@ -1,3 +1,11 @@
+//
+//  MemoryCache.swift
+//  ImageCache
+//
+//  Created by Jared Sinclair on 8/15/15.
+//  Copyright © 2020 Nice Boy LLC. All rights reserved.
+//
+
 import Foundation
 import Etcetera
 import Combine
