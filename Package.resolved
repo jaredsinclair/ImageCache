@@ -5,8 +5,8 @@
         "package": "Etcetera",
         "repositoryURL": "https://github.com/jaredsinclair/etcetera",
         "state": {
-          "branch": "master",
-          "revision": "a2ea700f45a94ad6055eca2381eb3e65b8bc1018",
+          "branch": "concurrency",
+          "revision": "6307fb61b5e5dcfb6a1869303106f3818f0186fe",
           "version": null
         }
       }

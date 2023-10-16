@@ -1,13 +1,6 @@
-//
-//  MemoryCache.swift
-//  ImageCache
-//
-//  Created by Jared Sinclair on 1/3/20.
-//  Copyright © 2020 Nice Boy LLC. All rights reserved.
-//
-
 import Foundation
 import Etcetera
+import Combine
 
 #if os(iOS)
 import UIKit
@@ -15,12 +8,12 @@ import UIKit
 import AppKit
 #endif
 
-final class MemoryCache<Key: Hashable, Value> {
+@MainActor final class MemoryCache<Key: Hashable, Value> {
 
     var shouldRemoveAllObjectsWhenAppEntersBackground = false
 
     private var items = ProtectedDictionary<Key, Value>()
-    private var observers = [NSObjectProtocol]()
+    private var cancellables = Set<AnyCancellable>()
 
     subscript(key: Key) -> Value? {
         get { return items[key] }
@@ -33,31 +26,32 @@ final class MemoryCache<Key: Hashable, Value> {
         }
     }
 
+    #if os(iOS)
     init() {
-        #if os(iOS)
-            observers.append(NotificationCenter.default.addObserver(
-                forName: UIApplication.didReceiveMemoryWarningNotification,
-                object: nil,
-                queue: .main,
-                using: { [weak self] _ in
+        NotificationCenter.default
+            .publisher(for: UIApplication.didReceiveMemoryWarningNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
                     self?.removeAll()
-            }))
-            observers.append(NotificationCenter.default.addObserver(
-                forName: UIApplication.didEnterBackgroundNotification,
-                object: nil,
-                queue: .main,
-                using: { [weak self] _ in
-                    guard let this = self else { return }
-                    if this.shouldRemoveAllObjectsWhenAppEntersBackground {
-                        this.removeAll()
-                    }
-            }))
-        #endif
-    }
+                }
+            }
+            .store(in: &cancellables)
 
-    deinit {
-        observers.forEach(NotificationCenter.default.removeObserver)
+        NotificationCenter.default
+            .publisher(for: UIScene.didEnterBackgroundNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    if self.shouldRemoveAllObjectsWhenAppEntersBackground {
+                        self.removeAll()
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
+    #endif
 
     func removeAll() {
         items.access { $0.removeAll() }
