@@ -297,6 +297,25 @@ import AppKit
         return image(for: key, completion: completion)
     }
 
+    /// Returns an image that already exists for the specified URL and format
+    /// options, if it exists in the in-memory cache. Does nothing else.
+    public func memoryCachedImage(
+        from url: URL,
+        format: Format = .original
+    ) -> Image? {
+        memoryCachedImage(from: .url(url), format: format)
+    }
+
+    /// Returns an image that already exists for the specified source and format
+    /// options, if it exists in the in-memory cache. Does nothing else.
+    public func memoryCachedImage(
+        from source: OriginalImageSource,
+        format: Format = .original
+    ) -> Image? {
+        let key = ImageKey(source: source, format: format)
+        return memoryCache[key]
+    }
+
     // MARK: Private Methods
 
     /// Fetches an image using all the heuristics described above.
