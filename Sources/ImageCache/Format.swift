@@ -64,7 +64,15 @@ extension ImageCache {
         /// - parameter contentScale: The number of pixels per point, which is
         /// used to reckon the output image size relative to the requested
         /// `size`. Pass `0` to use the native defaults for the current device.
-        case scaled(size: CGSize, mode: ContentMode, bleed: CGFloat, opaque: Bool, cornerRadius: CGFloat, border: Border?, contentScale: ContentScale)
+        case scaled(
+            size: CGSize,
+            mode: ContentMode = .scaleAspectFill,
+            bleed: CGFloat = 0,
+            opaque: Bool = false,
+            cornerRadius: CGFloat = 0,
+            border: Border? = nil,
+            contentScale: ContentScale = 0
+        )
 
         /// Scale the source image and crop it to an elliptical shape. The
         /// resulting image will have transparent contents in the corners.
@@ -77,7 +85,11 @@ extension ImageCache {
         /// - parameter contentScale: The number of pixels per point, which is
         /// used to reckon the output image size relative to the requested
         /// `size`. Pass `0` to use the native defaults for the current device.
-        case round(size: CGSize, border: Border?, contentScale: ContentScale)
+        case round(
+            size: CGSize,
+            border: Border? = nil,
+            contentScale: ContentScale = 0
+        )
 
         /// Draw the source image using a developer-supplied formatting block.
         ///
