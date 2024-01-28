@@ -18,8 +18,10 @@ let package = Package(
             name: "ImageCache",
             dependencies: [
                 "Etcetera"
-            ],
-            swiftSettings: [ .unsafeFlags(["-Xfrontend", "-strict-concurrency=complete"]) ]
+            ]
+            // Uncomment to enable complete strict concurrency checking. In a
+            // future update, it would be handy if this were scriptable in CI:
+            // swiftSettings: [ .unsafeFlags(["-Xfrontend", "-strict-concurrency=complete"]) ]
         ),
         .testTarget(name: "ImageCacheTests",
             dependencies: [
