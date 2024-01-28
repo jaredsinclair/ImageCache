@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "ImageCache", targets: ["ImageCache"])
     ],
     dependencies: [
-        .package(url: "https://github.com/jaredsinclair/etcetera", .branch("concurrency"))
+        .package(url: "https://github.com/jaredsinclair/etcetera", .upToNextMajor(from: "3.0.0"))
     ],
     targets: [
         .target(
