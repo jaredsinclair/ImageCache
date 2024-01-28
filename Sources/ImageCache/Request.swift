@@ -8,8 +8,8 @@
 
 import Foundation
 
-struct Request<Result> {
-    typealias Completion = (Result) -> Void
+struct Request<Result>: Sendable {
+    typealias Completion = @Sendable @MainActor (Result) -> Void
 
     let id = UUID()
     let completion: Completion

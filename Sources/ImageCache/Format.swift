@@ -17,7 +17,7 @@ import Etcetera
 extension ImageCache {
 
     /// Describes the format options to be used when processing a source image.
-    public enum Format {
+    public enum Format: Sendable {
 
         // MARK: Typealiases
 
@@ -64,7 +64,15 @@ extension ImageCache {
         /// - parameter contentScale: The number of pixels per point, which is
         /// used to reckon the output image size relative to the requested
         /// `size`. Pass `0` to use the native defaults for the current device.
-        case scaled(size: CGSize, mode: ContentMode, bleed: CGFloat, opaque: Bool, cornerRadius: CGFloat, border: Border?, contentScale: ContentScale)
+        case scaled(
+            size: CGSize,
+            mode: ContentMode = .scaleAspectFill,
+            bleed: CGFloat = 0,
+            opaque: Bool = false,
+            cornerRadius: CGFloat = 0,
+            border: Border? = nil,
+            contentScale: ContentScale = 0
+        )
 
         /// Scale the source image and crop it to an elliptical shape. The
         /// resulting image will have transparent contents in the corners.
@@ -77,7 +85,11 @@ extension ImageCache {
         /// - parameter contentScale: The number of pixels per point, which is
         /// used to reckon the output image size relative to the requested
         /// `size`. Pass `0` to use the native defaults for the current device.
-        case round(size: CGSize, border: Border?, contentScale: ContentScale)
+        case round(
+            size: CGSize,
+            border: Border? = nil,
+            contentScale: ContentScale = 0
+        )
 
         /// Draw the source image using a developer-supplied formatting block.
         ///
@@ -92,7 +104,7 @@ extension ImageCache {
         /// image. The developer does not need to cache the returned image.
         /// ImageCache will cache the result in the same manner as images drawn
         /// using the other formats.
-        case custom(editKey: String, block: (ImageCache.Image) -> ImageCache.Image)
+        case custom(editKey: String, block: @Sendable (ImageCache.Image) -> ImageCache.Image)
 
     }
 
@@ -105,7 +117,7 @@ extension ImageCache {
 extension ImageCache.Format {
 
     /// Platform-agnostic analogue to UIView.ContentMode
-    public enum ContentMode {
+    public enum ContentMode: Sendable {
 
         /// Contents scaled to fill with fixed aspect ratio. Some portion of
         /// the content may be clipped.
@@ -126,7 +138,7 @@ extension ImageCache.Format {
 extension ImageCache.Format {
 
     /// Border styles you can use when drawing a scaled or round image format.
-    public enum Border: Hashable {
+    public enum Border: Hashable, Sendable {
 
         case hairline(ImageCache.Color)
 

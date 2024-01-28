@@ -18,7 +18,7 @@ public extension ImageCache {
     /// Of these only the first two will have their original (canonical) images
     /// written to ImageCache's disk cache. If you use `.custom` it's your
     /// responsiblity to maintain a cache of the original value as needed.
-    enum OriginalImageSource: Hashable {
+    enum OriginalImageSource: Hashable, Sendable {
 
         /// The HTTP/FILE URL to the file.
         case url(URL)
@@ -31,8 +31,8 @@ public extension ImageCache {
 
         public typealias ImageIdentifier = String
         public typealias Namespace = String
-        public typealias Loader = (@escaping LoaderCompletion) -> Void
-        public typealias LoaderCompletion = (Image?) -> Void
+        public typealias Loader = @Sendable (@escaping LoaderCompletion) -> Void
+        public typealias LoaderCompletion = @Sendable (Image?) -> Void
 
         public static func ==(lhs: OriginalImageSource, rhs: OriginalImageSource) -> Bool {
             switch (lhs, rhs) {

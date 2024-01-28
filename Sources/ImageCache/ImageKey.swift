@@ -10,7 +10,7 @@ import Foundation
 import CoreGraphics
 
 /// Uniquely identifies a particular format of an image from a particular URL.
-final class ImageKey: Hashable {
+final class ImageKey: Hashable, Sendable {
 
     /// The source from which the original image can be obtained
     let source: ImageCache.OriginalImageSource

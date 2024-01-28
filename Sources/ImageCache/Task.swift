@@ -10,8 +10,8 @@ import Foundation
 
 struct Task<TaskID: Hashable, Result> {
 
-    typealias Cancellation = () -> Void
-    typealias Completion = (Result) -> Void
+    typealias Cancellation = @Sendable () -> Void
+    typealias Completion = @Sendable @MainActor (Result) -> Void
 
     var requests = [UUID: Request<Result>]()
     let id: TaskID

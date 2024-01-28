@@ -9,16 +9,23 @@
 import Foundation
 import Etcetera
 
-final class TaskRegistry<TaskID: Hashable, Result> {
+final class TaskRegistry<TaskID: Hashable & Sendable, Result: Sendable>: Sendable {
 
     typealias RequestID = UUID
-    typealias Finish = (Result) -> Void
+    typealias Finish = @Sendable @MainActor (Result) -> Void
     typealias TaskType = Task<TaskID, Result>
     typealias RequestType = Request<Result>
 
-    private var protectedTasks = Protected<[TaskID: TaskType]>([:])
+    private let protectedTasks = Protected<[TaskID: TaskType]>([:])
 
-    func addRequest(taskId: TaskID, workQueue: OperationQueue, taskExecution: @escaping (@escaping Finish) -> Void, taskCancellation: @escaping () -> Void, taskCompletion: @escaping TaskType.Completion, requestCompletion: @escaping RequestType.Completion) -> RequestID {
+    func addRequest(
+        taskId: TaskID,
+        workQueue: OperationQueue,
+        taskExecution: @escaping @Sendable (@escaping Finish) -> Void,
+        taskCancellation: @escaping @Sendable () -> Void,
+        taskCompletion: @escaping TaskType.Completion,
+        requestCompletion: @escaping RequestType.Completion
+    ) -> RequestID {
         let request = RequestType(completion: requestCompletion)
         protectedTasks.access { tasks in
             if var task = tasks[taskId] {

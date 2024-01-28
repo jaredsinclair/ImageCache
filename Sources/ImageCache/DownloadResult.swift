@@ -11,7 +11,7 @@ import Foundation
 /// Communicates to `ImageCache` whether the result of a download operation was
 /// that a new file was freshly downloaded, or whether a previously-downloaded
 /// file was able to be used.
-enum DownloadResult {
+enum DownloadResult: Sendable {
 
     /// A fresh file was downloaded and is available locally at a file URL.
     case fresh(URL)
