@@ -10,4 +10,4 @@ import Foundation
 import os.log
 import Etcetera
 
-let Log = OSLog(subsystem: "com.niceboy.ImageCache", category: "Images")
+nonisolated(unsafe) let Log = OSLog(subsystem: "com.niceboy.ImageCache", category: "Images")

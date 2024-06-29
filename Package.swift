@@ -1,4 +1,4 @@
-// swift-tools-version:5.1
+// swift-tools-version:6.0
 
 import PackageDescription
 
@@ -11,17 +11,15 @@ let package = Package(
         .library(name: "ImageCache", targets: ["ImageCache"])
     ],
     dependencies: [
-        .package(url: "https://github.com/jaredsinclair/etcetera", .upToNextMajor(from: "3.0.0"))
+        .package(url: "https://github.com/jaredsinclair/etcetera", .branch("swift6"))
     ],
     targets: [
         .target(
             name: "ImageCache",
             dependencies: [
-                "Etcetera"
-            ]
-            // Uncomment to enable complete strict concurrency checking. In a
-            // future update, it would be handy if this were scriptable in CI:
-            // swiftSettings: [ .unsafeFlags(["-Xfrontend", "-strict-concurrency=complete"]) ]
+                .product(name: "Etcetera", package: "Etcetera")
+            ],
+            swiftSettings: [ .swiftLanguageVersion(.v6) ]
         ),
         .testTarget(name: "ImageCacheTests",
             dependencies: [

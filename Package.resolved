@@ -1,16 +1,15 @@
 {
-  "object": {
-    "pins": [
-      {
-        "package": "Etcetera",
-        "repositoryURL": "https://github.com/jaredsinclair/etcetera",
-        "state": {
-          "branch": null,
-          "revision": "3dc4efd2d72bc6bb857c0d7d801e913935ce325c",
-          "version": "3.0.0"
-        }
+  "originHash" : "3658eff8210855bb447de760b4af1ad4ee3a10c3d92217f59f76e4b984f9676f",
+  "pins" : [
+    {
+      "identity" : "etcetera",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jaredsinclair/etcetera",
+      "state" : {
+        "branch" : "swift6",
+        "revision" : "5f595a4e48cffec0d17d3887fd77738375ca9d6d"
       }
-    ]
-  },
-  "version": 1
+    }
+  ],
+  "version" : 3
 }
