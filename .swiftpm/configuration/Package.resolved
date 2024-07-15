@@ -1,13 +1,13 @@
 {
-  "originHash" : "5b11a844fdcecbd183317890ddae25374d46e76c0327f7544b01856b435db43d",
+  "originHash" : "c6538bcd13bcfac34b5c2ac08cc844a5881060e647a57f46176f0689afc09b54",
   "pins" : [
     {
       "identity" : "etcetera",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jaredsinclair/etcetera",
       "state" : {
-        "revision" : "cb91e24c097f5e252aa13773b0f926fc7e03bbcb",
-        "version" : "4.0.0"
+        "branch" : "swift6",
+        "revision" : "a21de9f72a3cb15825896b59648bff7667bd79d2"
       }
     }
   ],

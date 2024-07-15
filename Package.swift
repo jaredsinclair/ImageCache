@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "ImageCache", targets: ["ImageCache"])
     ],
     dependencies: [
-        .package(url: "https://github.com/jaredsinclair/etcetera", .upToNextMajor(from: "4.0.0"))
+        .package(url: "https://github.com/jaredsinclair/etcetera", .branch("swift6"))
     ],
     targets: [
         .target(
