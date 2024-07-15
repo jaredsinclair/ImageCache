@@ -1,0 +1,15 @@
+{
+  "originHash" : "5b11a844fdcecbd183317890ddae25374d46e76c0327f7544b01856b435db43d",
+  "pins" : [
+    {
+      "identity" : "etcetera",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jaredsinclair/etcetera",
+      "state" : {
+        "revision" : "cb91e24c097f5e252aa13773b0f926fc7e03bbcb",
+        "version" : "4.0.0"
+      }
+    }
+  ],
+  "version" : 3
+}
