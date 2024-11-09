@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "ImageCache", targets: ["ImageCache"])
     ],
     dependencies: [
-        .package(url: "https://github.com/jaredsinclair/etcetera", .branch("swift6"))
+        .package(url: "https://github.com/jaredsinclair/etcetera", .upToNextMajor(from: "6.0.1"))
     ],
     targets: [
         .target(
@@ -19,7 +19,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Etcetera", package: "Etcetera")
             ],
-            swiftSettings: [ .swiftLanguageVersion(.v6) ]
+            swiftSettings: [ .swiftLanguageMode(.v6) ]
         ),
         .testTarget(name: "ImageCacheTests",
             dependencies: [
