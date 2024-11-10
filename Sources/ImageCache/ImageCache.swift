@@ -559,8 +559,7 @@ import AppKit
         let filename: String
         switch key.source {
         case .url(let url):
-            let getFilename = _uniqueFilenameFromUrl.current
-            filename = getFilename(url) + key.filenameSuffix
+            filename = uniqueFilenameFromUrl(url) + key.filenameSuffix
         case .manuallySeeded(let id):
             filename = "\(id).\(key.filenameSuffix)"
         case .custom(let identifier, let namespace, _):
