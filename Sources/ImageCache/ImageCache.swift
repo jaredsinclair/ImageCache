@@ -10,6 +10,7 @@
 // swiftlint:disable nesting - Seriously, why do we even Swift then.
 // swiftlint:disable function_parameter_count - Some problems are hard.
 
+import CryptoKit
 import Etcetera
 import Combine
 
@@ -47,6 +48,13 @@ import AppKit
         didSet { trimStaleFiles() }
     }
 
+    /// Your app can provide something stronger than the default implementation
+    /// (a string representation of a SHA1 hash) if so desired.
+    public nonisolated var uniqueFilenameFromUrl: (URL) -> String {
+        get { _uniqueFilenameFromUrl.current }
+        set { _uniqueFilenameFromUrl.current = newValue }
+    }
+
     /// When `true` this will empty the in-memory cache when the app enters the
     /// background. This can help reduce the likelihood that your app will be
     /// terminated in order to reclaim memory for foregrounded applications.
@@ -67,6 +75,7 @@ import AppKit
     private let formattingQueue: OperationQueue
     private let diskWritingQueue: OperationQueue
     private let workQueue: OperationQueue
+    private nonisolated let _uniqueFilenameFromUrl: Protected<(URL) -> String>
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: Init / Deinit
@@ -85,6 +94,7 @@ import AppKit
         directory: URL = ImageCache.defaultDirectory,
         byteLimitForFileStorage: Bytes? = .fromMegabytes(500)
     ) {
+        self._uniqueFilenameFromUrl = Protected(Insecure.SHA1.filename(for:))
         self.directory = directory
         self.byteLimitForFileStorage = byteLimitForFileStorage
         self.urlSession = {
@@ -533,7 +543,7 @@ import AppKit
         switch key.source {
         case .url(let url):
             let originalKey = ImageKey(source: .url(url), format: .original)
-            filename = FileNameHashes.uniqueFilename(from: url) + originalKey.filenameSuffix
+            filename = uniqueFilenameFromUrl(url) + originalKey.filenameSuffix
         case .manuallySeeded(let id):
             filename = "\(id).MANUALLY_SEEDED_ORIGINAL"
         case .custom(let id, let namespace, _):
@@ -548,7 +558,7 @@ import AppKit
         let filename: String
         switch key.source {
         case .url(let url):
-            filename = FileNameHashes.uniqueFilename(from: url) + key.filenameSuffix
+            filename = uniqueFilenameFromUrl(url) + key.filenameSuffix
         case .manuallySeeded(let id):
             filename = "\(id).\(key.filenameSuffix)"
         case .custom(let identifier, let namespace, _):
