@@ -543,8 +543,7 @@ import AppKit
         switch key.source {
         case .url(let url):
             let originalKey = ImageKey(source: .url(url), format: .original)
-            let getFilename = _uniqueFilenameFromUrl.current
-            filename = getFilename(url) + originalKey.filenameSuffix
+            filename = uniqueFilenameFromUrl(url) + originalKey.filenameSuffix
         case .manuallySeeded(let id):
             filename = "\(id).MANUALLY_SEEDED_ORIGINAL"
         case .custom(let id, let namespace, _):
