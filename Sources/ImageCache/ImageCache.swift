@@ -50,26 +50,7 @@ import AppKit
 
     /// Your app can provide something stronger than the default implementation
     /// (a string representation of a SHA1 hash) if so desired.
-    ///
-    /// - Warning: When compiling under Swift 6 language mode, the call site
-    ///   where your application sets the value of this block must __not__ be
-    ///   isolated to an actor (global or otherwise), otherwise a runtime check
-    ///   assumes that since the block was initialized in that actor's isolation
-    ///   context, when executed it should be isolated to that actor. That will
-    ///   fail since the registered block is executed on some utility queue
-    ///   within ImageCache. You must set this property from within a calling
-    ///   context that is deliberately nonisolated:
-    ///
-    /// ```swift
-    /// nonisolated func registerFilenameBlock() {
-    ///     ImageCache.shared.uniqueFilenameFromUrl = { ... }
-    /// }
-    /// ```
-    ///
-    /// This is particularly important if you are configuring this block from
-    /// something like your application delegate or a view controller, which are
-    /// MainActor isolated by default.
-    public nonisolated var uniqueFilenameFromUrl: (URL) -> String {
+    public nonisolated var uniqueFilenameFromUrl: @Sendable (URL) -> String {
         get { _uniqueFilenameFromUrl.current }
         set { _uniqueFilenameFromUrl.current = newValue }
     }
@@ -94,7 +75,7 @@ import AppKit
     private let formattingQueue: OperationQueue
     private let diskWritingQueue: OperationQueue
     private let workQueue: OperationQueue
-    private nonisolated let _uniqueFilenameFromUrl: Protected<(URL) -> String>
+    private nonisolated let _uniqueFilenameFromUrl: Protected<@Sendable (URL) -> String>
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: Init / Deinit
